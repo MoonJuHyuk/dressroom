@@ -272,3 +272,79 @@ main { padding-top: 16px; }
 .fit .cell.none { font-size: 11px; color: var(--mute); background: repeating-linear-gradient(135deg, transparent 0 6px, var(--ph) 6px 7px); }
 .fit .car.empty { display: grid; place-items: center; background: transparent; box-shadow: none; border: 1.5px dashed var(--line); color: var(--mute); font-size: 22px; }
 .fit .cap { font-size: 10.5px; color: var(--mute); text-align: center; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* =========================================================
+   Noir Maison (v0.4.0) — 흑백·얇은 선·대문자 자간. 배경 색은 html[data-bg]로 바꿈
+   ========================================================= */
+:root[data-bg] { --serif: 'Bodoni Moda', 'Noto Serif KR', Georgia, serif; --label: 'Archivo', 'Pretendard Variable', sans-serif; --r: 0px; --shadow: none; --danger: #B3261E; color-scheme: light; }
+:root[data-bg="white"]    { --bg:#FFFFFF; --paper:#FAFAFA; --ink:#0A0A0A; --ink2:#444444; --mute:#8C8C8C; --line:#E4E4E4; --ph:#F1F1F1; --accent:#0A0A0A; }
+:root[data-bg="ivory"]    { --bg:#F5F2EC; --paper:#FBF9F5; --ink:#111111; --ink2:#4A463F; --mute:#8F887C; --line:#E0D9CD; --ph:#EBE6DC; --accent:#111111; }
+:root[data-bg="gray"]     { --bg:#CFCFCB; --paper:#D9D9D5; --ink:#0A0A0A; --ink2:#2E2E2C; --mute:#5C5C58; --line:#B5B5B0; --ph:#C2C2BD; --accent:#0A0A0A; }
+:root[data-bg="navy"]     { --bg:#151B2B; --paper:#1C2335; --ink:#F2F0EA; --ink2:#C9CCD6; --mute:#8B92A6; --line:#2C3448; --ph:#222A3D; --accent:#F2F0EA; --danger:#FF8A80; color-scheme: dark; }
+:root[data-bg="charcoal"] { --bg:#2B2B2B; --paper:#333333; --ink:#F2F2F2; --ink2:#CFCFCF; --mute:#999999; --line:#444444; --ph:#3A3A3A; --accent:#F2F2F2; --danger:#FF8A80; color-scheme: dark; }
+:root[data-bg="black"]    { --bg:#0A0A0A; --paper:#141414; --ink:#F5F5F5; --ink2:#C8C8C8; --mute:#8A8A8A; --line:#262626; --ph:#1A1A1A; --accent:#F5F5F5; --danger:#FF8A80; color-scheme: dark; }
+body { transition: background-color .25s, color .25s; }
+
+/* 상단 */
+.top { background: color-mix(in srgb, var(--bg) 94%, transparent); }
+.wordmark { font-family: var(--serif); font-weight: 400; font-size: 30px; letter-spacing: .28em; text-transform: uppercase; }
+.brand.inner .wordmark { font-style: normal; font-size: 24px; letter-spacing: .18em; }
+.sub { font-family: var(--label); letter-spacing: .24em; font-size: 10.5px; }
+.iconbtn, .back { border-radius: 0; background: transparent; border-color: var(--line); }
+.owners { gap: 20px; border-bottom: 1px solid var(--line); padding: 8px 0 0; margin-bottom: 10px; }
+.owners button { border: 0; border-radius: 0; padding: 0 0 10px; background: none; font-family: var(--label); letter-spacing: .08em; font-size: 13px; color: var(--mute); margin-bottom: -1px; }
+.owners button[aria-pressed="true"] { background: none; color: var(--ink); border-bottom: 1px solid var(--ink); font-weight: 600; }
+.search, .sort { border-radius: 0; background: transparent; }
+
+/* 버튼 */
+.btn { border-radius: 0; font-family: var(--label); letter-spacing: .12em; font-weight: 500; }
+.btn.sm { letter-spacing: .14em; }
+.fab { border-radius: 0; font-family: var(--label); text-transform: uppercase; letter-spacing: .24em; font-size: 12px; font-weight: 500; box-shadow: none; }
+.chips button { border-radius: 0; background: transparent; }
+
+/* 코디·목록 전환 */
+.seg { background: none; border: 0; padding: 0; gap: 10px; align-items: baseline; justify-content: flex-start; color: var(--mute); }
+.seg button { flex: none; padding: 4px 0; border-radius: 0; font-family: var(--label); text-transform: uppercase; letter-spacing: .2em; font-size: 12px; color: var(--mute); }
+.seg button small { font-family: var(--sans, inherit); letter-spacing: 0; font-size: 10.5px; margin-left: 4px; text-transform: none; }
+.seg button[aria-pressed="true"] { background: none; color: var(--ink); font-weight: 600; border-bottom: 1px solid var(--ink); }
+.fittools { margin-bottom: 2px; }
+.fithint { font-size: 11px; color: var(--mute); margin: 6px 0 4px; }
+.bgpick { display: flex; gap: 8px; }
+.bgpick button { width: 24px; height: 24px; padding: 0; border-radius: 0; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); outline-offset: 2px; }
+.bgpick button[aria-pressed="true"] { outline: 1.5px solid var(--ink); }
+.bgpick.big { flex-wrap: wrap; gap: 10px; }
+.bgpick.big button { width: auto; height: auto; min-width: 84px; padding: 0 0 0 30px; position: relative; background: transparent; border: 1px solid var(--line); font-size: 12.5px; line-height: 36px; padding-right: 12px; color: var(--ink); text-align: left; }
+.bgpick.big button::before { content: ''; position: absolute; left: 8px; top: 9px; width: 16px; height: 16px; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); }
+.bgpick.big button[aria-pressed="true"] { outline: 0; border-color: var(--ink); }
+
+/* 코디 칸 */
+.fit svg.body { stroke-width: .5; }
+.fit .lab { font-family: var(--label); text-transform: uppercase; letter-spacing: .14em; font-size: 9.5px; }
+.fit .lab i { color: var(--ink2); }
+.fit .car { border-radius: 0; box-shadow: none; border: 0; background: var(--ph); }
+.fit .car.empty { border: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); }
+.fit .cap { color: var(--ink2); }
+
+/* 목록·카드 */
+.tile { border-radius: 0; box-shadow: none; }
+.tile .en { font-family: var(--serif); font-style: normal; letter-spacing: .12em; text-transform: uppercase; font-size: 15px; }
+.tile .n { font-family: var(--serif); }
+.ph-empty { font-family: var(--serif); font-style: normal; color: var(--line); }
+.card .ph, .gallery, .pp, .mphoto, .note, .sugg, .verdict, .mrow .ph { border-radius: 0; }
+.card .who { border-radius: 0; font-family: var(--label); letter-spacing: .08em; }
+.feature { border-radius: 0; min-height: 140px; }
+.feature .kicker, .kicker { font-family: var(--label); font-style: normal; text-transform: uppercase; letter-spacing: .22em; font-size: 10.5px; color: var(--mute); }
+.feature .h b { font-family: var(--serif); color: inherit; }
+.feature:not(.alt) .kicker { color: color-mix(in srgb, var(--bg) 70%, transparent); }
+.sec { font-family: var(--label); text-transform: uppercase; letter-spacing: .18em; font-size: 11.5px; }
+.sec span { font-family: var(--serif); color: var(--ink); }
+.banner { border-radius: 0; border-color: var(--line); }
+
+/* 시트 */
+.sheet { border-radius: 0; }
+@media (min-width: 700px) { .sheet { border-radius: 0; } }
+.x { border-radius: 0; background: transparent; }
+.shead h2 { font-weight: 600; letter-spacing: -.01em; }
+.fld > span, .set h3, .specs dt { font-family: var(--label); text-transform: uppercase; letter-spacing: .16em; font-size: 10.5px; }
+.fld input, .fld textarea, .fld select { border-radius: 0; background: transparent; }
+.toast { border-radius: 0; font-family: var(--label); letter-spacing: .04em; }

@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.3.2';
+const VERSION = '0.4.0';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -11,16 +11,16 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 
 /* ---------------- 카테고리 · 주인 ---------------- */
 const CATS = [
-  { k: 'hat', ko: '모자', en: 'Hats' },
-  { k: 'glasses', ko: '안경', en: 'Eyewear' },
-  { k: 'scarf', ko: '목도리', en: 'Scarves' },
-  { k: 'tshirt', ko: '티셔츠', en: 'Tees' },
-  { k: 'jacket', ko: '자켓', en: 'Jackets' },
-  { k: 'watch', ko: '시계', en: 'Watches' },
-  { k: 'bag', ko: '가방', en: 'Bags' },
-  { k: 'pants', ko: '바지', en: 'Trousers' },
-  { k: 'socks', ko: '양말', en: 'Socks' },
-  { k: 'shoes', ko: '신발', en: 'Shoes' },
+  { k: 'hat', ko: '모자', en: 'Hats', up: 'HAT' },
+  { k: 'glasses', ko: '안경', en: 'Eyewear', up: 'EYEWEAR' },
+  { k: 'scarf', ko: '목도리', en: 'Scarves', up: 'SCARF' },
+  { k: 'tshirt', ko: '티셔츠', en: 'Tees', up: 'TEE' },
+  { k: 'jacket', ko: '자켓', en: 'Jackets', up: 'JACKET' },
+  { k: 'watch', ko: '시계', en: 'Watches', up: 'WATCH' },
+  { k: 'bag', ko: '가방', en: 'Bags', up: 'BAG' },
+  { k: 'pants', ko: '바지', en: 'Trousers', up: 'TROUSERS' },
+  { k: 'socks', ko: '양말', en: 'Socks', up: 'SOCKS' },
+  { k: 'shoes', ko: '신발', en: 'Shoes', up: 'SHOES' },
 ];
 const CAT = Object.fromEntries(CATS.map(c => [c.k, c]));
 const catKo = k => CAT[k]?.ko || '기타';
@@ -31,9 +31,19 @@ const ownerName = k => (S.cfg.owners || DEFAULT_OWNERS)[k] || DEFAULT_OWNERS[k] 
 const S = {
   items: [], loaded: false, offline: false,
   owner: LS.get('dr.owner', 'all'), view: 'home', cat: null, q: '', sort: LS.get('dr.sort', 'recent'),
-  mode: LS.get('dr.homeMode', 'fit'), fit: LS.get('dr.fit', {}),
+  mode: LS.get('dr.homeMode', 'fit'), fit: LS.get('dr.fit', {}), bg: LS.get('dr.bg', 'white'),
   store: null, conn: null, cfg: {},
 };
+
+/* ---------------- 배경 색 (옷이 배경에 따라 달라 보여서 바꿔 볼 수 있게, 기기마다 저장) ---------------- */
+const BGS = [['white', '화이트', '#FFFFFF'], ['ivory', '아이보리', '#F5F2EC'], ['gray', '그레이', '#CFCFCB'], ['navy', '네이비', '#151B2B'], ['charcoal', '차콜', '#2B2B2B'], ['black', '블랙', '#0A0A0A']];
+function applyBg(k) {
+  if (!BGS.some(b => b[0] === k)) k = 'white';
+  S.bg = k; LS.set('dr.bg', k);
+  document.documentElement.dataset.bg = k;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', BGS.find(b => b[0] === k)[2]);
+  document.querySelectorAll('[data-bg]').forEach(b => { if (b.tagName === 'BUTTON') b.setAttribute('aria-pressed', b.dataset.bg === k); });
+}
 
 /* ---------------- 공통 ---------------- */
 let toastTm;
@@ -207,7 +217,7 @@ const FIT_SLOTS = [
   { k: 'socks', l: 2, t: 70, w: 22, ar: '1' },
   { k: 'shoes', l: 36, t: 83, w: 28, ar: '4/3' },
 ];
-const segHTML = () => S.loaded ? `<div class="seg" role="group"><button data-mode="fit" aria-pressed="${S.mode === 'fit'}">코디</button><button data-mode="list" aria-pressed="${S.mode === 'list'}">목록</button></div>` : '';
+const segHTML = () => S.loaded ? `<div class="seg" role="group"><button data-mode="fit" aria-pressed="${S.mode === 'fit'}">Look <small>코디</small></button><span>/</span><button data-mode="list" aria-pressed="${S.mode === 'list'}">Wardrobe <small>목록</small></button></div>` : '';
 const fitItems = (list, k) => list.filter(i => i.category === k).sort(sortFn('recent'));
 function fitIndex(items, k) {
   const sel = S.fit[k];
@@ -220,16 +230,17 @@ function fitHTML(list) {
   const slot = sl => {
     const c = CAT[sl.k], items = fitItems(list, sl.k), idx = fitIndex(items, sl.k);
     const pos = `left:${sl.l}%;top:${sl.t}%;width:${sl.w}%`;
-    if (!items.length) return `<div class="slot" style="${pos}"><div class="lab"><span>${c.ko}</span><i>—</i></div>
+    if (!items.length) return `<div class="slot" style="${pos}"><div class="lab"><span>${c.up}</span><i>—</i></div>
       <button class="car empty" style="aspect-ratio:${sl.ar}" data-add="${sl.k}" aria-label="${c.ko} 등록">＋</button><div class="cap">눌러서 등록</div></div>`;
     const cells = items.map(it => `<button class="cell" data-id="${esc(it.id)}">${it.photos?.[0]
       ? `<img data-photo="${esc(it.photos[0])}" data-size="${Math.min(800, Math.round(260 * (window.devicePixelRatio || 2)))}" alt="">`
       : `<span class="txt">${esc(titleOf(it))}</span>`}</button>`).join('') + `<span class="cell none">안 입음</span>`;
-    return `<div class="slot" style="${pos}" data-slot="${sl.k}"><div class="lab"><span>${c.ko}</span><i data-n>${idx < items.length ? idx + 1 : '–'}/${items.length}</i></div>
+    return `<div class="slot" style="${pos}" data-slot="${sl.k}"><div class="lab"><span>${c.up}</span><i data-n>${idx < items.length ? idx + 1 : '–'}/${items.length}</i></div>
       <div class="car" style="aspect-ratio:${sl.ar}" data-k="${sl.k}" data-idx="${idx}">${cells}</div>
       <div class="cap" data-cap>${idx < items.length ? esc(titleOf(items[idx])) : '안 입음'}</div></div>`;
   };
-  return `<div class="fittools"><span>칸을 좌우로 밀어 바꿔 입어 보세요</span><button class="btn sm" id="shuffle">섞기</button></div>
+  return `<div class="fittools"><div class="bgpick" role="group" aria-label="배경 색">${BGS.map(([k, l, c]) => `<button data-bg="${k}" style="--sw:${c}" aria-pressed="${S.bg === k}" title="${l}" aria-label="${l}"></button>`).join('')}</div><button class="btn sm" id="shuffle">Shuffle</button></div>
+    <p class="fithint">칸을 좌우로 밀어 바꿔 입어 보세요 · 왼쪽 색을 누르면 배경이 바뀌어요</p>
     <div class="fit">
       <svg class="body" viewBox="0 0 100 160" aria-hidden="true">
         <circle cx="50" cy="17" r="8.5"/><path d="M46 25h8v4h-8z"/>
@@ -657,11 +668,16 @@ function openSettings() {
       <div class="row-btns"><button class="btn sm" id="keySave">저장</button>${S.cfg.claudeKey ? '<button class="btn sm ghost danger" id="keyDel">키 지우기</button>' : ''}</div>
     </section>
     <section class="set">
+      <h3>배경 색</h3>
+      <div class="bgpick big" role="group">${BGS.map(([k, l, c]) => `<button data-bg="${k}" style="--sw:${c}" aria-pressed="${S.bg === k}"><span>${l}</span></button>`).join('')}</div>
+    </section>
+    <section class="set">
       <h3>앱</h3>
       <div class="row-btns"><button class="btn sm" id="reload">새로고침</button>${conn ? '<button class="btn sm ghost danger" id="disc">이 기기 연결 끊기</button>' : ''}</div>
       <p class="hint">Dressroom v${VERSION}</p>
     </section>`, 'settings');
   const q = s => sh.querySelector(s);
+  sh.querySelectorAll('button[data-bg]').forEach(b => b.onclick = () => applyBg(b.dataset.bg));
   if (conn) q('#copyLink').onclick = async () => {
     const link = connectLinkFor(S.conn);
     if (navigator.share) { try { await navigator.share({ title: 'Dressroom 연결', text: '이 링크를 열면 우리집 옷장에 연결돼요', url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
@@ -697,6 +713,7 @@ $('#owners').addEventListener('click', e => {
 });
 $('#view').addEventListener('click', e => {
   const md = e.target.closest('[data-mode]'); if (md) { S.mode = md.dataset.mode; LS.set('dr.homeMode', S.mode); render(); return; }
+  const bgb = e.target.closest('button[data-bg]'); if (bgb) { applyBg(bgb.dataset.bg); return; }
   const add = e.target.closest('[data-add]'); if (add) { openForm(null, { category: add.dataset.add }); return; }
   const cell = e.target.closest('.cell[data-id]'); if (cell) { openDetail(cell.dataset.id); return; }
   const tile = e.target.closest('.tile'); if (tile) { go('cat', tile.dataset.cat); return; }
@@ -711,6 +728,7 @@ $('#q').addEventListener('input', e => { S.q = e.target.value; render(); });
 $('#sort').addEventListener('change', e => { S.sort = e.target.value; LS.set('dr.sort', S.sort); render(); });
 
 /* ---------------- 실행 ---------------- */
+applyBg(S.bg);
 readConnFromHash();
 pickStore();
 history.replaceState({ view: 'home' }, '');
