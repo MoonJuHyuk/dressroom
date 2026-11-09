@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.2.2';
+const VERSION = '0.3.0';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -30,6 +30,7 @@ const ownerName = k => (S.cfg.owners || DEFAULT_OWNERS)[k] || DEFAULT_OWNERS[k] 
 const S = {
   items: [], loaded: false, offline: false,
   owner: LS.get('dr.owner', 'all'), view: 'home', cat: null, q: '', sort: LS.get('dr.sort', 'recent'),
+  mode: LS.get('dr.homeMode', 'fit'), fit: LS.get('dr.fit', {}),
   store: null, conn: null, cfg: {},
 };
 
@@ -182,8 +183,77 @@ function render() {
   if (q) box.innerHTML = gridHTML(list.filter(it => matchesQ(it, q)).sort(sortFn('recent')), `검색 결과`);
   else if (v === 'cat') box.innerHTML = gridHTML(list.filter(it => it.category === S.cat).sort(sortFn(S.sort)), null, true);
   else if (v === 'idle') box.innerHTML = idleHTML(list);
-  else box.innerHTML = homeHTML(list);
+  else box.innerHTML = segHTML() + (S.mode === 'fit' ? fitHTML(list) : homeHTML(list));
   hydrate(box);
+  if (!q && v === 'home' && S.mode === 'fit') bindFit(box, list);
+}
+
+/* ---------------- 코디 화면 (실루엣 위에 부위별 칸, 좌우로 밀어 바꿔 입기) ---------------- */
+// 위치는 화면 비율(가로 10 : 세로 16) 기준 %. 시계는 그림 속 사람의 왼손목(화면 오른쪽)
+const FIT_SLOTS = [
+  { k: 'hat', l: 37, t: 0, w: 26, ar: '1' },
+  { k: 'glasses', l: 2, t: 9, w: 24, ar: '1' },
+  { k: 'scarf', l: 74, t: 11, w: 24, ar: '1' },
+  { k: 'tshirt', l: 25.5, t: 24, w: 23.5, ar: '4/5' },
+  { k: 'jacket', l: 51, t: 24, w: 23.5, ar: '4/5' },
+  { k: 'watch', l: 76, t: 38, w: 22, ar: '1' },
+  { k: 'pants', l: 36, t: 52, w: 28, ar: '3/4' },
+  { k: 'socks', l: 2, t: 70, w: 22, ar: '1' },
+  { k: 'shoes', l: 36, t: 83, w: 28, ar: '4/3' },
+];
+const segHTML = () => S.loaded ? `<div class="seg" role="group"><button data-mode="fit" aria-pressed="${S.mode === 'fit'}">코디</button><button data-mode="list" aria-pressed="${S.mode === 'list'}">목록</button></div>` : '';
+const fitItems = (list, k) => list.filter(i => i.category === k).sort(sortFn('recent'));
+function fitIndex(items, k) {
+  const sel = S.fit[k];
+  if (sel === 'none') return items.length;
+  const i = items.findIndex(x => String(x.id) === String(sel));
+  return i >= 0 ? i : 0;
+}
+function fitHTML(list) {
+  if (!S.loaded) return '<div class="empty">불러오는 중…</div>';
+  const slot = sl => {
+    const c = CAT[sl.k], items = fitItems(list, sl.k), idx = fitIndex(items, sl.k);
+    const pos = `left:${sl.l}%;top:${sl.t}%;width:${sl.w}%`;
+    if (!items.length) return `<div class="slot" style="${pos}"><div class="lab"><span>${c.ko}</span><i>—</i></div>
+      <button class="car empty" style="aspect-ratio:${sl.ar}" data-add="${sl.k}" aria-label="${c.ko} 등록">＋</button><div class="cap">눌러서 등록</div></div>`;
+    const cells = items.map(it => `<button class="cell" data-id="${esc(it.id)}">${it.photos?.[0]
+      ? `<img data-photo="${esc(it.photos[0])}" data-size="${Math.min(800, Math.round(260 * (window.devicePixelRatio || 2)))}" alt="">`
+      : `<span class="txt">${esc(titleOf(it))}</span>`}</button>`).join('') + `<span class="cell none">안 입음</span>`;
+    return `<div class="slot" style="${pos}" data-slot="${sl.k}"><div class="lab"><span>${c.ko}</span><i data-n>${idx < items.length ? idx + 1 : '–'}/${items.length}</i></div>
+      <div class="car" style="aspect-ratio:${sl.ar}" data-k="${sl.k}" data-idx="${idx}">${cells}</div>
+      <div class="cap" data-cap>${idx < items.length ? esc(titleOf(items[idx])) : '안 입음'}</div></div>`;
+  };
+  return `<div class="fittools"><span>칸을 좌우로 밀어 바꿔 입어 보세요</span><button class="btn sm" id="shuffle">섞기</button></div>
+    <div class="fit">
+      <svg class="body" viewBox="0 0 100 160" aria-hidden="true">
+        <circle cx="50" cy="17" r="8.5"/><path d="M46 25h8v4h-8z"/>
+        <path d="M34 31q16-5 32 0l6 3 5 30-5 1-5-24-1 30H39l-1-30-5 24-5-1 5-30z"/>
+        <path d="M39 71h22l2 50-1 26h-8l-3-50-1 0-3 50h-8l-1-26z"/>
+      </svg>
+      ${FIT_SLOTS.map(slot).join('')}
+    </div>`;
+}
+function bindFit(box, list) {
+  box.querySelectorAll('.car[data-k]').forEach(car => {
+    const k = car.dataset.k, items = fitItems(list, k);
+    const go = (i, smooth) => car.scrollTo({ left: i * car.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+    requestAnimationFrame(() => go(Number(car.dataset.idx), false));
+    let tm;
+    car.addEventListener('scroll', () => {
+      clearTimeout(tm);
+      tm = setTimeout(() => {
+        const i = Math.round(car.scrollLeft / Math.max(1, car.clientWidth));
+        const slot = car.closest('.slot');
+        slot.querySelector('[data-n]').textContent = `${i < items.length ? i + 1 : '–'}/${items.length}`;
+        slot.querySelector('[data-cap]').textContent = i < items.length ? titleOf(items[i]) : '안 입음';
+        S.fit[k] = i < items.length ? String(items[i].id) : 'none';
+        LS.set('dr.fit', S.fit);
+      }, 120);
+    }, { passive: true });
+    car._go = go; car._n = items.length;
+  });
+  const sh = box.querySelector('#shuffle');
+  if (sh) sh.onclick = () => box.querySelectorAll('.car[data-k]').forEach(car => car._go(Math.floor(Math.random() * car._n), true));
 }
 
 function homeHTML(list) {
@@ -606,6 +676,9 @@ $('#owners').addEventListener('click', e => {
   S.owner = b.dataset.o; LS.set('dr.owner', S.owner); renderOwners(); render();
 });
 $('#view').addEventListener('click', e => {
+  const md = e.target.closest('[data-mode]'); if (md) { S.mode = md.dataset.mode; LS.set('dr.homeMode', S.mode); render(); return; }
+  const add = e.target.closest('[data-add]'); if (add) { openForm(null, { category: add.dataset.add }); return; }
+  const cell = e.target.closest('.cell[data-id]'); if (cell) { openDetail(cell.dataset.id); return; }
   const tile = e.target.closest('.tile'); if (tile) { go('cat', tile.dataset.cat); return; }
   const card = e.target.closest('.card'); if (card) { openDetail(card.dataset.id); return; }
   if (e.target.closest('#goMatch')) openMatch();
