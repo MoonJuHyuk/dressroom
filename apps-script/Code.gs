@@ -236,7 +236,7 @@ function thumbs_(ids, size) {
   if (!ids.length) return [];
   const token = ScriptApp.getOAuthToken();
   const reqs = ids.map(id => ({
-    url: 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + Math.min(Number(size) || 320, 800),
+    url: 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + Math.min(Number(size) || 320, 1600),
     headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true, followRedirects: true,
   }));
   const res = UrlFetchApp.fetchAll(reqs);

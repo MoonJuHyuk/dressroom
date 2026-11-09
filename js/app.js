@@ -1,7 +1,8 @@
 import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, connectLinkFor, blobToBase64 } from './store.js';
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
+import { cropImage } from './crop.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -340,24 +341,43 @@ function openForm(orig = null, preset = {}) {
 
   const drawPhotos = () => {
     const box = sh.querySelector('#photos');
-    box.innerHTML = kept.map((p, i) => `<span class="pp"><img data-photo="${esc(p)}" data-size="400" alt=""><button type="button" data-rk="${i}" aria-label="사진 빼기">×</button></span>`).join('')
-      + fresh.map((x, i) => `<span class="pp"><img src="${x.u}" alt=""><button type="button" data-rf="${i}" aria-label="사진 빼기">×</button></span>`).join('')
+    box.innerHTML = kept.map((p, i) => `<span class="pp"><img data-photo="${esc(p)}" data-size="400" alt=""><button type="button" data-rk="${i}" aria-label="사진 빼기">×</button><button type="button" class="cut" data-ck="${i}" aria-label="사진 자르기">✂</button></span>`).join('')
+      + fresh.map((x, i) => `<span class="pp"><img src="${x.u}" alt=""><button type="button" data-rf="${i}" aria-label="사진 빼기">×</button><button type="button" class="cut" data-cf="${i}" aria-label="사진 자르기">✂</button></span>`).join('')
       + (kept.length + fresh.length ? '' : '<span class="pp none">사진을 찍거나 불러오세요<br><small>여러 장 가능</small></span>');
     hydrate(box);
   };
   drawPhotos();
-  sh.querySelector('#photos').addEventListener('click', e => {
-    const k = e.target.dataset.rk, fr = e.target.dataset.rf;
-    if (k !== undefined) { kept.splice(Number(k), 1); drawPhotos(); }
-    if (fr !== undefined) { URL.revokeObjectURL(fresh[fr].u); fresh.splice(Number(fr), 1); drawPhotos(); }
+  sh.querySelector('#photos').addEventListener('click', async e => {
+    const d = e.target.dataset;
+    if (d.rk !== undefined) { kept.splice(Number(d.rk), 1); drawPhotos(); }
+    if (d.rf !== undefined) { URL.revokeObjectURL(fresh[d.rf].u); fresh.splice(Number(d.rf), 1); drawPhotos(); }
+    if (d.cf !== undefined) {
+      const i = Number(d.cf), b = await cropImage(fresh[i].b);
+      if (b) { URL.revokeObjectURL(fresh[i].u); fresh[i] = { b, u: URL.createObjectURL(b) }; drawPhotos(); }
+    }
+    if (d.ck !== undefined) {
+      // 이미 저장된 사진: 원본을 받아 자르고, 자른 사진으로 바꿔 저장 (원래 사진은 저장할 때 정리됨)
+      const i = Number(d.ck);
+      busy('사진을 불러오는 중…');
+      let src = null;
+      try { const t = (await S.store.thumbs([kept[i]], 1600))[0]; if (t) src = await (await fetch(`data:${t.type};base64,${t.data}`)).blob(); }
+      catch (err) {} finally { busy(''); }
+      if (!src) { toast('사진을 불러오지 못했어요'); return; }
+      const b = await cropImage(src);
+      if (b) { kept.splice(i, 1); fresh.unshift({ b, u: URL.createObjectURL(b) }); drawPhotos(); toast('저장을 누르면 자른 사진으로 바뀌어요'); }
+    }
   });
-  const addFiles = async files => {
+  const addFiles = async (files, offerCrop = false) => {
     for (const file of files) {
-      try { const b = await shrink(file); fresh.push({ b, u: URL.createObjectURL(b) }); } catch (e) { toast('사진을 읽지 못했어요'); }
+      try {
+        let b = await shrink(file);
+        if (offerCrop) { const c = await cropImage(b); if (c) b = c; } // 취소하면 전체 사진 그대로
+        fresh.push({ b, u: URL.createObjectURL(b) });
+      } catch (e) { toast('사진을 읽지 못했어요'); }
     }
     drawPhotos();
   };
-  sh.querySelector('#camIn').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+  sh.querySelector('#camIn').onchange = e => { addFiles([...e.target.files], true); e.target.value = ''; };
   sh.querySelector('#albIn').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
 
   const chipGroup = (sel, key) => sh.querySelector(sel).addEventListener('click', e => {
@@ -373,7 +393,8 @@ function openForm(orig = null, preset = {}) {
   sh.querySelector('#labelIn').onchange = async e => {
     const file = e.target.files[0]; e.target.value = '';
     if (!file) return;
-    let b; try { b = await shrink(file, 1600, 0.88); } catch (err) { toast('사진을 읽지 못했어요'); return; }
+    let b; try { b = await shrink(file, 2000, 0.9); } catch (err) { toast('사진을 읽지 못했어요'); return; }
+    const c = await cropImage(b); if (c) b = c; // 라벨 부분만 남기면 더 잘 읽어요
     fresh.push({ b, u: URL.createObjectURL(b) }); drawPhotos();
     runLookup(form, it, sh, b);
   };
@@ -461,11 +482,16 @@ function openMatch() {
       blob = await shrink(file, 1280, 0.82);
       if (url) URL.revokeObjectURL(url);
       url = URL.createObjectURL(blob);
-      sh.querySelector('#mphoto').innerHTML = `<img src="${url}" alt="">`;
+      sh.querySelector('#mphoto').innerHTML = `<img src="${url}" alt=""><button type="button" class="btn sm light cutbig" id="mCut">✂ 자르기</button>`;
+      sh.querySelector('#mCut').onclick = async () => { const c = await cropImage(blob, { max: 1280, quality: 0.82 }); if (c) { blob = c; URL.revokeObjectURL(url); url = URL.createObjectURL(blob); sh.querySelector('#mphoto img').src = url; } };
       refresh();
     } catch (e) { toast('사진을 읽지 못했어요'); }
   };
-  sh.querySelector('#mCam').onchange = e => { e.target.files[0] && setPhoto(e.target.files[0]); e.target.value = ''; };
+  sh.querySelector('#mCam').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    await setPhoto(f);
+    if (blob) { const c = await cropImage(blob, { max: 1280, quality: 0.82 }); if (c) { blob = c; URL.revokeObjectURL(url); url = URL.createObjectURL(blob); sh.querySelector('#mphoto img').src = url; } }
+  };
   sh.querySelector('#mAlb').onchange = e => { e.target.files[0] && setPhoto(e.target.files[0]); e.target.value = ''; };
   sh.querySelector('#mCats').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
