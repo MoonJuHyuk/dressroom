@@ -348,3 +348,48 @@ body { transition: background-color .25s, color .25s; }
 .fld > span, .set h3, .specs dt { font-family: var(--label); text-transform: uppercase; letter-spacing: .16em; font-size: 10.5px; }
 .fld input, .fld textarea, .fld select { border-radius: 0; background: transparent; }
 .toast { border-radius: 0; font-family: var(--label); letter-spacing: .04em; }
+
+/* =========================================================
+   v0.4.2 정리 (frontend-design) — 영어 대문자 라벨은 로고·종류 이름에만,
+   한국어는 자간 없이, 글꼴은 Bodoni + Pretendard 두 가지, 타일 사진 위 검은 덮개 없앰
+   ========================================================= */
+:root[data-bg] { --label: var(--sans); }
+
+/* 한국어 글씨는 자간을 띄우지 않음 */
+.sub { font-family: var(--sans); letter-spacing: 0; font-size: 12.5px; text-transform: none; }
+.owners button { font-family: var(--sans); letter-spacing: 0; font-size: 14px; }
+.btn, .btn.sm { font-family: var(--sans); letter-spacing: 0; font-weight: 600; }
+.fab { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 600; }
+.seg { gap: 20px; }
+.seg button { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 15px; padding: 4px 0 8px; }
+.fit .lab { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 11px; }
+.fit .lab i { font-family: var(--serif); font-size: 12px; }
+.sec { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); }
+.fld > span, .set h3, .specs dt { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.kicker, .feature .kicker { font-family: var(--serif); text-transform: none; letter-spacing: .02em; font-size: 15px; color: var(--mute); }
+.card .who, .toast { font-family: var(--sans); letter-spacing: 0; }
+.banner .btn { letter-spacing: 0; }
+
+/* 홈 타일: 사진은 그대로, 이름과 개수는 사진 아래 (룩북 목차처럼) */
+.tile { background: none; overflow: visible; }
+.tile .ph::after { content: none; }
+.tile .cap { position: static; color: var(--ink); padding: 8px 0 2px; grid-template-columns: 1fr auto; border-bottom: 1px solid var(--line); }
+.tile .en { grid-column: 1; grid-row: 1; font-size: 13px; letter-spacing: .14em; }
+.tile .n { grid-column: 2; grid-row: 1; font-size: 15px; }
+.tile .ko { grid-column: 1 / span 2; grid-row: 2; font-size: 11.5px; letter-spacing: 0; opacity: 1; color: var(--mute); margin-top: 1px; }
+.tiles { row-gap: 18px; }
+
+/* 기능 카드: 위 라벨 없이 제목부터 */
+.feature { gap: 8px; }
+.feature .h { font-size: 17px; }
+
+/* 배경 색 고르기: 손가락으로 누르기 쉬운 크기 */
+.bgpick { gap: 10px; }
+.bgpick button { width: 32px; height: 32px; }
+.fittools { margin-bottom: 4px; }
+
+/* 키보드로 움직일 때 선택된 곳 표시, 동작 줄이기 설정 존중 */
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

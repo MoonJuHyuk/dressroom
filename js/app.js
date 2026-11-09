@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -176,13 +176,13 @@ function render() {
   const total = list.length;
   if (v === 'home') {
     $('#title').textContent = 'Dressroom';
-    $('#sub').textContent = S.loaded ? `${S.owner === 'all' ? '우리집' : ownerName(S.owner)} 옷장 · ${total}벌` : ' ';
+    $('#sub').textContent = S.loaded ? `${S.owner === 'all' ? '우리집' : ownerName(S.owner)} 옷장 ${total}벌` : ' ';
   } else if (v === 'cat') {
     $('#title').textContent = CAT[S.cat]?.en || '';
-    $('#sub').textContent = `${catKo(S.cat)} · ${list.filter(i => i.category === S.cat).length}개`;
+    $('#sub').textContent = `${catKo(S.cat)} ${list.filter(i => i.category === S.cat).length}개`;
   } else if (v === 'idle') {
-    $('#title').textContent = 'Forgotten';
-    $('#sub').textContent = '오래 손이 안 간 옷';
+    $('#title').textContent = '오래 안 입은 옷';
+    $('#sub').textContent = '마지막으로 입은 지 오래된 순';
   }
   $('#sort').hidden = v !== 'cat';
   $('#sort').innerHTML = SORTS.map(([k, l]) => `<option value="${k}" ${S.sort === k ? 'selected' : ''}>${l}</option>`).join('');
@@ -217,7 +217,7 @@ const FIT_SLOTS = [
   { k: 'socks', l: 2, t: 70, w: 22, ar: '1' },
   { k: 'shoes', l: 36, t: 83, w: 28, ar: '4/3' },
 ];
-const segHTML = () => S.loaded ? `<div class="seg" role="group"><button data-mode="fit" aria-pressed="${S.mode === 'fit'}">Look <small>코디</small></button><span>/</span><button data-mode="list" aria-pressed="${S.mode === 'list'}">Wardrobe <small>목록</small></button></div>` : '';
+const segHTML = () => S.loaded ? `<div class="seg" role="group"><button data-mode="fit" aria-pressed="${S.mode === 'fit'}">코디</button><button data-mode="list" aria-pressed="${S.mode === 'list'}">목록</button></div>` : '';
 const fitItems = (list, k) => list.filter(i => i.category === k).sort(sortFn('recent'));
 function fitIndex(items, k) {
   const sel = S.fit[k];
@@ -230,17 +230,17 @@ function fitHTML(list) {
   const slot = sl => {
     const c = CAT[sl.k], items = fitItems(list, sl.k), idx = fitIndex(items, sl.k);
     const pos = `left:${sl.l}%;top:${sl.t}%;width:${sl.w}%`;
-    if (!items.length) return `<div class="slot" style="${pos}"><div class="lab"><span>${c.up}</span><i>—</i></div>
+    if (!items.length) return `<div class="slot" style="${pos}"><div class="lab"><span>${c.ko}</span><i>—</i></div>
       <button class="car empty" style="aspect-ratio:${sl.ar}" data-add="${sl.k}" aria-label="${c.ko} 등록">＋</button><div class="cap">눌러서 등록</div></div>`;
     const cells = items.map(it => `<button class="cell" data-id="${esc(it.id)}">${it.photos?.[0]
       ? `<img data-photo="${esc(it.photos[0])}" data-size="${Math.min(800, Math.round(260 * (window.devicePixelRatio || 2)))}" alt="">`
       : `<span class="txt">${esc(titleOf(it))}</span>`}</button>`).join('') + `<span class="cell none">안 입음</span>`;
-    return `<div class="slot" style="${pos}" data-slot="${sl.k}"><div class="lab"><span>${c.up}</span><i data-n>${idx < items.length ? idx + 1 : '–'}/${items.length}</i></div>
+    return `<div class="slot" style="${pos}" data-slot="${sl.k}"><div class="lab"><span>${c.ko}</span><i data-n>${idx < items.length ? idx + 1 : '–'}/${items.length}</i></div>
       <div class="car" style="aspect-ratio:${sl.ar}" data-k="${sl.k}" data-idx="${idx}">${cells}</div>
       <div class="cap" data-cap>${idx < items.length ? esc(titleOf(items[idx])) : '안 입음'}</div></div>`;
   };
-  return `<div class="fittools"><div class="bgpick" role="group" aria-label="배경 색">${BGS.map(([k, l, c]) => `<button data-bg="${k}" style="--sw:${c}" aria-pressed="${S.bg === k}" title="${l}" aria-label="${l}"></button>`).join('')}</div><button class="btn sm" id="shuffle">Shuffle</button></div>
-    <p class="fithint">칸을 좌우로 밀어 바꿔 입어 보세요 · 왼쪽 색을 누르면 배경이 바뀌어요</p>
+  return `<div class="fittools"><div class="bgpick" role="group" aria-label="배경 색">${BGS.map(([k, l, c]) => `<button data-bg="${k}" style="--sw:${c}" aria-pressed="${S.bg === k}" title="${l}" aria-label="${l}"></button>`).join('')}</div><button class="btn sm" id="shuffle">섞기</button></div>
+    <p class="fithint">칸을 좌우로 밀어 바꿔 입어 보세요. 위의 색을 누르면 배경이 바뀌어요.</p>
     <div class="fit">
       <svg class="body" viewBox="0 0 100 160" aria-hidden="true">
         <circle cx="50" cy="17" r="8.5"/><path d="M46 25h8v4h-8z"/>
@@ -280,7 +280,7 @@ function homeHTML(list) {
     const cover = its.find(i => i.photos?.length);
     return `<button class="tile" data-cat="${c.k}">
       <span class="ph">${cover ? `<img data-photo="${esc(cover.photos[0])}" data-size="${thumbSize()}" alt="">` : `<span class="ph-empty">${c.en.charAt(0)}</span>`}</span>
-      <span class="cap"><span class="en">${c.en}</span><span class="ko">${c.ko}</span><span class="n">${its.length}</span></span>
+      <span class="cap"><span class="en">${c.en}</span><span class="n">${its.length}</span><span class="ko">${c.ko}</span></span>
     </button>`;
   }).join('');
   const yearAgo = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
@@ -288,12 +288,10 @@ function homeHTML(list) {
   return `<section class="tiles">${tiles}</section>
     <section class="cards">
       <button class="feature" id="goMatch">
-        <span class="kicker">In the shop</span>
         <span class="h">매장에서 비교하기</span>
         <span class="p">사고 싶은 옷을 찍으면 집에 있는 비슷한 옷과 어울리는 옷을 찾아드려요.</span>
       </button>
       <button class="feature alt" id="goIdle">
-        <span class="kicker">Forgotten</span>
         <span class="h">오래 손이 안 간 옷 <b>${idle}</b></span>
         <span class="p">1년 넘게 입은 기록이 없는 옷을 모아 봐요.</span>
       </button>
@@ -420,7 +418,7 @@ function openForm(orig = null, preset = {}) {
   let kept = [...(it.photos || [])];
   let fresh = (preset._blobs || []).map(b => ({ b, u: URL.createObjectURL(b) }));
   const f = (k, label, attrs = '') => `<label class="fld"><span>${label}</span><input name="${k}" value="${esc(it[k] ?? '')}" ${attrs}></label>`;
-  const sh = openSheet(`${sheetHead(orig ? '옷 정보 수정' : '새 옷 등록', orig ? 'Edit' : 'New piece')}
+  const sh = openSheet(`${sheetHead(orig ? '옷 정보 수정' : '새 옷 등록', '')}
     <div class="photos" id="photos"></div>
     <div class="photobtns">
       <label class="btn"><input type="file" accept="image/*" capture="environment" id="camIn" hidden>사진 찍기</label>
@@ -572,7 +570,7 @@ async function runLookup(form, it, sh, labelBlob = null) {
 /* ---------------- 매장에서 비교 ---------------- */
 function openMatch() {
   let blob = null, url = null, cat = '';
-  const sh = openSheet(`${sheetHead('매장에서 비교하기', 'In the shop')}
+  const sh = openSheet(`${sheetHead('매장에서 비교하기')}
     <p class="lead">사고 싶은 옷을 찍고 종류를 고르면, 집에 있는 같은 종류를 바로 보여드려요. <b>AI로 비교</b>를 누르면 비슷한 옷과 같이 입기 좋은 옷을 골라줘요.</p>
     <div class="mphoto" id="mphoto"><span>사진을 찍어 주세요</span></div>
     <div class="photobtns">
@@ -646,7 +644,7 @@ function openMatch() {
 function openSettings() {
   const conn = S.store.kind === 'sheet';
   const owners = S.cfg.owners || DEFAULT_OWNERS;
-  const sh = openSheet(`${sheetHead('설정', 'Settings')}
+  const sh = openSheet(`${sheetHead('설정')}
     <section class="set">
       <h3>연결</h3>
       ${conn ? `<p>구글시트 <b>Dressroom</b>에 연결돼 있어요. 두 분 폰이 같은 옷장을 봐요.</p>
