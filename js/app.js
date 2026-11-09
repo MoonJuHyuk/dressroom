@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -101,7 +101,16 @@ async function load() {
     render();
     try { S.items = await S.store.list(); } catch (e) { S.offline = true; }
     S.loaded = true;
-    S.store.getConfig().then(c => { S.cfg = c; renderOwners(); }).catch(() => {});
+    S.store.getConfig().then(async c => {
+      S.cfg = c;
+      // 연결 전에 이 기기에 넣어 둔 API 키·이름이 있으면 시트로 옮겨 두 기기가 같이 쓰게 함
+      const lk = LS.get('dr.key', ''), lo = LS.get('dr.owners', null), mv = {};
+      if (lk && !c.claudeKey) mv.claudeKey = lk;
+      if (lo && !c.owners) mv.owners = lo;
+      if (Object.keys(mv).length) { try { S.cfg = await S.store.setConfig(mv); LS.del('dr.key'); LS.del('dr.owners'); toast('이 기기에 넣어 둔 설정을 옷장으로 옮겼어요'); } catch (e) {} }
+      else if (lk && c.claudeKey) LS.del('dr.key');
+      renderOwners();
+    }).catch(() => {});
   } else {
     S.items = await LocalStore.list();
     S.cfg = await LocalStore.getConfig();
