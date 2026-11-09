@@ -138,7 +138,8 @@ export const photoFallback = photo => photo && !photo.startsWith('local:') ? `ht
 export function parseConnect(str) {
   try {
     // 카톡·구글시트 앱 등을 거치면 링크가 %3D 같은 꼴로 바뀌어 올 수 있어 여러 번 풀어 봄
-    let t = String(str);
+    // 줄바꿈·공백·보이지 않는 글자가 섞여 복사되는 경우가 있어 모두 지움
+    let t = String(str).replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '');
     for (let i = 0; i < 3; i++) { try { const d = decodeURIComponent(t); if (d === t) break; t = d; } catch (e) { break; } }
     const m = t.match(/connect=([A-Za-z0-9_\-+\/=]+)/);
     let tok = (m ? m[1] : t.trim()).replace(/=+$/, '').replace(/-/g, '+').replace(/_/g, '/');

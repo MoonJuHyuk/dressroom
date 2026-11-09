@@ -1,7 +1,7 @@
 import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, connectLinkFor, blobToBase64 } from './store.js';
 import { lookupModel, matchShopping, MODELS } from './ai.js';
 
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -499,8 +499,8 @@ function openSettings() {
         ${S.cfg.sheetUrl ? `<a class="btn ghost" href="${esc(S.cfg.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a>` : ''}</div>
         <p class="hint">와이프 폰 등 다른 기기에서 이 링크를 한 번 열면 연결돼요. 가족 외에는 보내지 마세요.</p>`
       : `<p>연결 링크를 붙여넣으면 구글시트 옷장에 연결돼요.</p>
-        <label class="fld"><input id="connIn" placeholder="https://…#connect=…"></label>
-        <button class="btn primary" id="connBtn">연결</button>`}
+        <label class="fld"><textarea id="connIn" rows="3" placeholder="https://…#connect=…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea></label>
+        <div class="row-btns">${navigator.clipboard?.readText ? '<button class="btn" id="pasteBtn">복사한 링크 붙여넣기</button>' : ''}<button class="btn primary" id="connBtn">연결</button></div>`}
     </section>
     <section class="set">
       <h3>주인 이름</h3>
@@ -526,9 +526,14 @@ function openSettings() {
     if (navigator.share) { try { await navigator.share({ title: 'Dressroom 연결', text: '이 링크를 열면 우리집 옷장에 연결돼요', url: link }); return; } catch (e) { if (e.name === 'AbortError') return; } }
     try { await navigator.clipboard.writeText(link); toast('링크를 복사했어요'); } catch (e) { prompt('이 링크를 복사하세요', link); }
   };
-  else q('#connBtn').onclick = () => {
-    const c = parseConnect(q('#connIn').value);
-    if (!c) { toast('연결 링크가 올바르지 않아요'); return; }
+  if (!conn && q('#pasteBtn')) q('#pasteBtn').onclick = async () => {
+    try { q('#connIn').value = await navigator.clipboard.readText(); q('#connBtn').click(); }
+    catch (e) { toast('붙여넣기 권한이 없어요. 입력칸을 길게 눌러 붙여넣어 주세요', 5000); }
+  };
+  if (!conn) q('#connBtn').onclick = () => {
+    const raw = q('#connIn').value;
+    const c = parseConnect(raw);
+    if (!c) { const r = raw.trim(); toast(`연결 링크가 올바르지 않아요 (${r.length}자 · "${r.slice(0, 32)}…")`, 7000); return; }
     LS.set('dr.conn', c); pickStore(); closeSheet(); load(); toast('연결했어요');
   };
   q('#ownSave').onclick = async () => {
