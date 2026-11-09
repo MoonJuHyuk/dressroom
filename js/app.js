@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -129,7 +129,11 @@ function go(view, cat = null, push = true) {
   render();
 }
 window.addEventListener('popstate', e => {
-  if (!$('#overlay').hidden) { closeSheet(false); return; }
+  if (!$('#overlay').hidden) {
+    // 등록 중에 뒤로가기를 눌러도 바로 닫지 않고 물어봄
+    if (!canLeave()) { history.pushState({ ...(e.state || {}), sheet: 1 }, ''); return; }
+    closeSheet(false); return;
+  }
   const st = e.state || {};
   S.view = st.view || 'home'; S.cat = st.cat || null;
   render();
@@ -308,7 +312,11 @@ function idleHTML(list) {
 }
 
 /* ---------------- 시트(팝업) ---------------- */
+// 작성 중인 내용이 있는 창(등록·수정·매장 비교)은 바깥을 눌러도 닫히지 않고, 닫을 때 한 번 물어봄
+let sheetDirty = null; // () => true 이면 작성 중
+const canLeave = () => !(sheetDirty && sheetDirty()) || confirm('작성 중인 내용이 사라져요. 닫을까요?');
 function openSheet(html, cls = '') {
+  sheetDirty = null;
   const sh = $('#sheet');
   sh.className = 'sheet ' + cls;
   sh.innerHTML = html;
@@ -320,14 +328,20 @@ function openSheet(html, cls = '') {
   return sh;
 }
 function closeSheet(viaHistory = true) {
+  sheetDirty = null;
   $('#overlay').hidden = true;
   document.body.classList.remove('locked');
   $('#sheet').innerHTML = '';
   if (viaHistory && history.state?.sheet) history.back();
 }
-$('#overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeSheet(); });
+$('#overlay').addEventListener('click', e => {
+  if (e.target.id !== 'overlay') return;
+  const cls = $('#sheet').classList;
+  if (cls.contains('form') || cls.contains('match')) return; // 등록·비교 창은 바깥 클릭으로 닫지 않음
+  closeSheet();
+});
 const sheetHead = (title, kicker = '') => `<div class="shead"><div>${kicker ? `<div class="kicker">${kicker}</div>` : ''}<h2>${title}</h2></div><button class="x" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
-$('#sheet').addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
+$('#sheet').addEventListener('click', e => { if (e.target.closest('[data-close]') && canLeave()) closeSheet(); });
 
 /* ---------------- 상세 ---------------- */
 function openDetail(id) {
@@ -469,6 +483,8 @@ function openForm(orig = null, preset = {}) {
   chipGroup('#catChips', 'category'); chipGroup('#ownChips', 'owner');
 
   const form = sh.querySelector('#form');
+  const start = JSON.stringify([...new FormData(form)]) + it.category + it.owner + kept.join();
+  sheetDirty = () => fresh.length > 0 || JSON.stringify([...new FormData(form)]) + it.category + it.owner + kept.join() !== start;
   sh.querySelector('#lookBtn').onclick = () => runLookup(form, it, sh);
   // 라벨(택) 사진: 글자를 읽고 검색해 제안. 라벨 사진은 옷 사진 맨 뒤에도 넣어 둠
   sh.querySelector('#labelIn').onchange = async e => {
@@ -493,6 +509,7 @@ function openForm(orig = null, preset = {}) {
     try {
       const saved = await saveItem(o, fresh.map(x => x.b), fresh.length ? `사진 ${fresh.length}장과 함께 저장하는 중…` : '저장하는 중…');
       fresh.forEach(x => URL.revokeObjectURL(x.u));
+      sheetDirty = null;
       toast(orig ? '수정했어요' : '옷장에 넣었어요');
       openDetail(saved.id);
     } catch (e) {}
@@ -552,6 +569,7 @@ function openMatch() {
     <div id="mSame"></div>
     <div class="actions"><button class="btn primary" id="mRun" disabled>AI로 비교</button></div>
     <div id="mOut"></div>`, 'match');
+  sheetDirty = () => !!blob;
   const refresh = () => {
     sh.querySelector('#mRun').disabled = !(blob && cat);
     const same = mine().filter(i => i.category === cat).sort(sortFn('recent'));
