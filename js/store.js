@@ -137,9 +137,13 @@ export const photoFallback = photo => photo && !photo.startsWith('local:') ? `ht
 /* ---------- 연결 링크 ---------- */
 export function parseConnect(str) {
   try {
-    const m = String(str).match(/connect=([A-Za-z0-9_\-=]+)/);
-    const tok = m ? m[1] : String(str).trim();
-    const json = atob(tok.replace(/-/g, '+').replace(/_/g, '/'));
+    // 카톡·구글시트 앱 등을 거치면 링크가 %3D 같은 꼴로 바뀌어 올 수 있어 여러 번 풀어 봄
+    let t = String(str);
+    for (let i = 0; i < 3; i++) { try { const d = decodeURIComponent(t); if (d === t) break; t = d; } catch (e) { break; } }
+    const m = t.match(/connect=([A-Za-z0-9_\-+\/=]+)/);
+    let tok = (m ? m[1] : t.trim()).replace(/=+$/, '').replace(/-/g, '+').replace(/_/g, '/');
+    while (tok.length % 4) tok += '=';
+    const json = atob(tok);
     const c = JSON.parse(decodeURIComponent(escape(json)));
     if (!c.u || !c.s || !/^https:\/\/script\.google(usercontent)?\.com\//.test(c.u)) return null;
     return c;

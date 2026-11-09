@@ -1,7 +1,7 @@
 import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, connectLinkFor, blobToBase64 } from './store.js';
 import { lookupModel, matchShopping, MODELS } from './ai.js';
 
-const VERSION = '0.1.2';
+const VERSION = '0.1.3';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -80,9 +80,10 @@ async function shrink(file, max = 1600, q = 0.85) {
 
 /* ---------------- 시작 ---------------- */
 function readConnFromHash() {
-  if (!location.hash.includes('connect=')) return;
-  const c = parseConnect(location.hash);
-  history.replaceState(null, '', location.pathname + location.search);
+  const href = location.href;
+  if (!/connect(=|%3D)/i.test(href)) return;
+  const c = parseConnect(href);
+  history.replaceState(null, '', location.pathname);
   if (c) { LS.set('dr.conn', c); toast('옷장에 연결했어요'); }
   else toast('연결 링크가 올바르지 않아요');
 }
