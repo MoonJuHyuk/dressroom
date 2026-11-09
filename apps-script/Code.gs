@@ -94,6 +94,10 @@ function connectLink() {
   const secret = PropertiesService.getScriptProperties().getProperty('SECRET');
   const token = Utilities.base64EncodeWebSafe(JSON.stringify({ u: url, s: secret }));
   Logger.log('📱 이 링크를 폰·PC에서 한 번 열면 연결됩니다 (가족 외에는 공유하지 마세요):\n' + APP_URL + '#connect=' + token);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('연결') || ss.insertSheet('연결');
+  sh.getRange('A1:A3').setValues([['폰에서 아래 링크를 누르면 Dressroom에 연결됩니다 (가족 외 공유 금지)'], [APP_URL + '#connect=' + token], ['링크가 새면 Apps Script에서 resetSecret → connectLink 다시 실행']]);
+  sh.setColumnWidth(1, 700);
 }
 
 /** 연결 링크가 새어 나갔을 때 실행: 비밀키를 바꿔 기존 기기 연결을 모두 끊습니다. */
