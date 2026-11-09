@@ -68,6 +68,46 @@ Reply with ONLY one JSON object in a \`\`\`json code block:
 }
 
 /**
+ * 라벨(택·케어라벨) 사진 → 적힌 글자를 읽고, 모델 코드가 보이면 웹에서 확인. 제안만 합니다.
+ * 옷 자체 사진으로 색·브랜드를 짐작하지 않고, 라벨에 적힌 글자와 찾은 근거만 씁니다.
+ */
+export async function readLabel({ key, model, imageBase64, brand, modelName, category, categories, signal }) {
+  const text = `You help a couple catalogue clothes and accessories in their home wardrobe app.
+The photo shows a LABEL or TAG (brand label, price tag, care/composition label, size tag, box label, or the back of a watch).
+
+Step 1 — read it: transcribe the useful text exactly as printed (brand, product name, style/model/article number, size, fibre composition, colour code/name, price, made in).
+Step 2 — if a style/model/article number or a product name is visible, use web search to confirm that exact product and find its official name, colour and material.
+
+The owner may already know (may be blank): brand "${brand || ''}", model "${modelName || ''}", category "${category || ''}".
+
+ACCURACY RULE — a blank is better than a guess:
+- Fill a field only from text printed on the label, or from a source you found for THIS exact product.
+- Do NOT guess colour, material or brand from how the garment or label looks.
+- "material": the fibre composition as printed, translated into Korean, e.g. "면 100%" or "울 70%, 나일론 30%".
+- "size": exactly as printed (e.g. "M", "100", "270", "EU 42 / UK 8").
+- "releasePrice": only a price printed on the tag (converted to KRW if the tag is in KRW) or an official price you found; otherwise null.
+
+Allowed "category" keys: ${JSON.stringify(categories)}.
+Write "color", "material", "summary" in Korean (keep brand/product names in their original spelling).
+
+Reply with ONLY one JSON object in a \`\`\`json code block:
+{"labelText": "the key text you read, one line, separated by ' · '", "brand": string|null, "model": "style/model/article number"|null, "name": "official product name"|null, "category": one key or null, "color": string|null, "material": string|null, "size": string|null, "releasePrice": number in KRW or null, "releasePriceText": string|null, "summary": "1 sentence"|null, "sources": ["url", "..."]}`;
+  const blocks = await ask({
+    key, model: model || MODELS.sonnet, signal, maxTokens: 2000,
+    content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
+      { type: 'text', text },
+    ],
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
+  });
+  const out = extractJson(blocks);
+  const cited = new Set(Array.isArray(out.sources) ? out.sources : []);
+  blocks.forEach(b => (b.citations || []).forEach(c => c.url && cited.add(c.url)));
+  out.sources = [...cited].filter(u => /^https?:\/\//.test(u)).slice(0, 4);
+  return out;
+}
+
+/**
  * 매장에서 찍은 옷 사진 + 집에 있는 옷 미리보기 → 비슷한 옷 / 같이 입기 좋은 옷.
  * owned = [{id, label, thumb:{data,type}}]  (id는 item.id)
  */

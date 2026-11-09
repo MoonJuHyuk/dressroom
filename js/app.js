@@ -1,7 +1,7 @@
 import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, connectLinkFor, blobToBase64 } from './store.js';
-import { lookupModel, matchShopping, MODELS } from './ai.js';
+import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 
-const VERSION = '0.1.4';
+const VERSION = '0.2.0';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -323,7 +323,11 @@ function openForm(orig = null, preset = {}) {
       <div class="fld"><span>종류</span><div class="chips" id="catChips">${CATS.map(c => `<button type="button" data-v="${c.k}" aria-pressed="${it.category === c.k}">${c.ko}</button>`).join('')}</div></div>
       <div class="fld"><span>주인</span><div class="chips" id="ownChips">${OWNER_KEYS.map(k => `<button type="button" data-v="${k}" aria-pressed="${it.owner === k}">${esc(ownerName(k))}</button>`).join('')}</div></div>
       <div class="two">${f('brand', '브랜드')}${f('model', '모델명', 'placeholder="알면 적고 → 정보 찾기"')}</div>
-      <div class="lookup"><button type="button" class="btn sm" id="lookBtn">모델명으로 정보 찾기</button><span class="hint">빈 칸에 넣을 내용을 제안만 해요</span></div>
+      <div class="lookup">
+        <label class="btn sm"><input type="file" accept="image/*" capture="environment" id="labelIn" hidden>라벨 찍어서 찾기</label>
+        <button type="button" class="btn sm" id="lookBtn">모델명으로 찾기</button>
+        <span class="hint">빈 칸에 넣을 내용을 제안만 해요</span>
+      </div>
       <div id="sugg"></div>
       ${f('name', '이름(별칭)', 'placeholder="예: 네이비 울 코트"')}
       <div class="two">${f('color', '색상')}${f('material', '소재')}</div>
@@ -365,6 +369,14 @@ function openForm(orig = null, preset = {}) {
 
   const form = sh.querySelector('#form');
   sh.querySelector('#lookBtn').onclick = () => runLookup(form, it, sh);
+  // 라벨(택) 사진: 글자를 읽고 검색해 제안. 라벨 사진은 옷 사진 맨 뒤에도 넣어 둠
+  sh.querySelector('#labelIn').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = '';
+    if (!file) return;
+    let b; try { b = await shrink(file, 1600, 0.88); } catch (err) { toast('사진을 읽지 못했어요'); return; }
+    fresh.push({ b, u: URL.createObjectURL(b) }); drawPhotos();
+    runLookup(form, it, sh, b);
+  };
 
   form.onsubmit = async e => {
     e.preventDefault();
@@ -386,23 +398,27 @@ function openForm(orig = null, preset = {}) {
 }
 
 /* 모델명 → 정보 찾기: 빈 칸에 넣을 값만 제안, 적용은 사용자가 */
-async function runLookup(form, it, sh) {
+async function runLookup(form, it, sh, labelBlob = null) {
   const modelName = form.model.value.trim();
-  if (!modelName) { toast('모델명을 먼저 적어 주세요'); form.model.focus(); return; }
+  if (!labelBlob && !modelName) { toast('모델명을 먼저 적거나, 라벨을 찍어 주세요'); form.model.focus(); return; }
   if (!S.cfg.claudeKey) { toast('설정에서 Claude API 키를 먼저 넣어 주세요', 4000); return; }
   const box = sh.querySelector('#sugg'), btn = sh.querySelector('#lookBtn');
-  btn.disabled = true; box.innerHTML = '<div class="sugg loading"><div class="spin sm"></div>검색하는 중… (10~30초)</div>';
+  btn.disabled = true; box.innerHTML = `<div class="sugg loading"><div class="spin sm"></div>${labelBlob ? '라벨을 읽고 검색하는 중… (20~40초)' : '검색하는 중… (10~30초)'}</div>`;
   try {
-    const r = await lookupModel({ key: S.cfg.claudeKey, model: S.cfg.model, brand: form.brand.value.trim(), modelName, category: it.category, categories: CATS.map(c => c.k) });
+    const common = { key: S.cfg.claudeKey, model: S.cfg.model, brand: form.brand.value.trim(), category: it.category, categories: CATS.map(c => c.k) };
+    const r = labelBlob
+      ? await readLabel({ ...common, imageBase64: await blobToBase64(labelBlob), modelName })
+      : await lookupModel({ ...common, modelName });
     const cand = [
-      ['brand', '브랜드', r.brand], ['name', '이름(별칭)', r.name], ['color', '색상', r.color], ['material', '소재', r.material],
+      ['brand', '브랜드', r.brand], ['model', '모델명', labelBlob ? r.model : null], ['name', '이름(별칭)', r.name], ['color', '색상', r.color], ['material', '소재', r.material], ['size', '사이즈', r.size],
       ['price', '금액(원) · 출시가', r.releasePrice ? String(r.releasePrice) : null, r.releasePriceText],
       ['category', '종류', r.category && CAT[r.category] ? r.category : null],
     ].filter(c => has(c[2]));
-    if (!cand.length) { box.innerHTML = '<div class="sugg"><p>이 모델명으로 확실한 정보를 찾지 못했어요. 직접 입력해 주세요.</p></div>'; return; }
+    if (!cand.length) { box.innerHTML = `<div class="sugg"><p>${labelBlob ? '라벨에서 확실한 정보를 읽지 못했어요. 글자가 잘 보이게 가까이서 다시 찍어 보세요.' : '이 모델명으로 확실한 정보를 찾지 못했어요. 직접 입력해 주세요.'}</p></div>`; return; }
     const cur = k => k === 'category' ? it.category : form[k].value.trim();
     box.innerHTML = `<div class="sugg"><div class="sh">찾은 정보 <small>맞는 것만 적용하세요</small></div>
       ${cand.map(([k, l, v, extra]) => `<div class="srow"><span class="l">${l}</span><span class="v">${esc(k === 'category' ? catKo(v) : k === 'price' ? Number(v).toLocaleString('ko-KR') + '원' : v)}${extra ? ` <small>(${esc(extra)})</small>` : ''}${has(cur(k)) ? ' <small class="kept">· 입력값 있음</small>' : ''}</span><button type="button" class="btn sm" data-ap="${k}">적용</button></div>`).join('')}
+      ${r.labelText ? `<p class="sum"><b>라벨에서 읽은 글자</b> ${esc(r.labelText)}</p>` : ''}
       ${r.summary ? `<p class="sum">${esc(r.summary)}</p>` : ''}
       ${r.sources?.length ? `<div class="srcs">출처 ${r.sources.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${i + 1}</a>`).join(' ')}</div>` : ''}
       <div class="sbtns"><button type="button" class="btn sm primary" id="apEmpty">빈 칸에만 모두 적용</button><button type="button" class="btn sm ghost" id="apClose">닫기</button></div></div>`;

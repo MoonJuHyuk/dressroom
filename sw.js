@@ -1,5 +1,5 @@
 // 오프라인에서도 앱이 열리도록 화면 파일을 저장해 둡니다. 앱을 고치면 VERSION을 올리세요 (js/app.js와 같이).
-const VERSION = 'dressroom-v0.1.4';
+const VERSION = 'dressroom-v0.2.0';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/store.js', 'js/ai.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
