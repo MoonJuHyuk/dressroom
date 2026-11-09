@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -17,6 +17,7 @@ const CATS = [
   { k: 'tshirt', ko: '티셔츠', en: 'Tees' },
   { k: 'jacket', ko: '자켓', en: 'Jackets' },
   { k: 'watch', ko: '시계', en: 'Watches' },
+  { k: 'bag', ko: '가방', en: 'Bags' },
   { k: 'pants', ko: '바지', en: 'Trousers' },
   { k: 'socks', ko: '양말', en: 'Socks' },
   { k: 'shoes', ko: '신발', en: 'Shoes' },
@@ -197,6 +198,7 @@ const FIT_SLOTS = [
   { k: 'tshirt', l: 25.5, t: 24, w: 23.5, ar: '4/5' },
   { k: 'jacket', l: 51, t: 24, w: 23.5, ar: '4/5' },
   { k: 'watch', l: 76, t: 38, w: 22, ar: '1' },
+  { k: 'bag', l: 2, t: 42, w: 22, ar: '1' },
   { k: 'pants', l: 36, t: 52, w: 28, ar: '3/4' },
   { k: 'socks', l: 2, t: 70, w: 22, ar: '1' },
   { k: 'shoes', l: 36, t: 83, w: 28, ar: '4/3' },

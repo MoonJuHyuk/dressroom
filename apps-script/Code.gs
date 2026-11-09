@@ -44,7 +44,7 @@ const NUMERIC = ['price', 'wornCount'];
 const TEXTY = ['id', 'purchased', 'lastWorn', 'created', 'updated', 'size', 'model'];
 const CATS = [
   ['hat', '모자'], ['glasses', '안경'], ['scarf', '목도리'], ['tshirt', '티셔츠'], ['jacket', '자켓'],
-  ['watch', '시계'], ['pants', '바지'], ['socks', '양말'], ['shoes', '신발'],
+  ['watch', '시계'], ['bag', '가방'], ['pants', '바지'], ['socks', '양말'], ['shoes', '신발'],
 ];
 
 /* ---------------- 처음 한 번 ---------------- */
