@@ -2,7 +2,7 @@ import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, 
 import { lookupModel, readLabel, matchShopping, MODELS } from './ai.js';
 import { cropImage } from './crop.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
@@ -431,7 +431,8 @@ function openForm(orig = null, preset = {}) {
       <div class="fld"><span>주인</span><div class="chips" id="ownChips">${OWNER_KEYS.map(k => `<button type="button" data-v="${k}" aria-pressed="${it.owner === k}">${esc(ownerName(k))}</button>`).join('')}</div></div>
       <div class="two">${f('brand', '브랜드')}${f('model', '모델명', 'placeholder="알면 적고 → 정보 찾기"')}</div>
       <div class="lookup">
-        <label class="btn sm"><input type="file" accept="image/*" capture="environment" id="labelIn" hidden>라벨 찍어서 찾기</label>
+        <label class="btn sm"><input type="file" accept="image/*" capture="environment" id="labelIn" hidden>라벨 찍기</label>
+        <label class="btn sm"><input type="file" accept="image/*" id="labelAlb" hidden>라벨 불러오기</label>
         <button type="button" class="btn sm" id="lookBtn">모델명으로 찾기</button>
         <span class="hint">빈 칸에 넣을 내용을 제안만 해요</span>
       </div>
@@ -498,7 +499,7 @@ function openForm(orig = null, preset = {}) {
   sheetDirty = () => fresh.length > 0 || JSON.stringify([...new FormData(form)]) + it.category + it.owner + kept.join() !== start;
   sh.querySelector('#lookBtn').onclick = () => runLookup(form, it, sh);
   // 라벨(택) 사진: 글자를 읽고 검색해 제안. 라벨 사진은 옷 사진 맨 뒤에도 넣어 둠
-  sh.querySelector('#labelIn').onchange = async e => {
+  const onLabel = async e => {
     const file = e.target.files[0]; e.target.value = '';
     if (!file) return;
     let b; try { b = await shrink(file, 2000, 0.9); } catch (err) { toast('사진을 읽지 못했어요'); return; }
@@ -506,6 +507,8 @@ function openForm(orig = null, preset = {}) {
     fresh.push({ b, u: URL.createObjectURL(b) }); drawPhotos();
     runLookup(form, it, sh, b);
   };
+  sh.querySelector('#labelIn').onchange = onLabel;   // 카메라로 찍기
+  sh.querySelector('#labelAlb').onchange = onLabel;  // 앨범에서 불러오기
 
   form.onsubmit = async e => {
     e.preventDefault();
