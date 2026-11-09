@@ -1,7 +1,7 @@
 import { LS, LocalStore, makeSheetStore, photoUrl, photoFallback, parseConnect, connectLinkFor, blobToBase64 } from './store.js';
 import { lookupModel, matchShopping, MODELS } from './ai.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const has = v => v !== undefined && v !== null && v !== '';
